@@ -2,9 +2,10 @@ const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const MiniCSSExtractPlugin = require('mini-css-extract-plugin')
 const path = require('path')
+const TODAYS_SOURCE = "src_2022_04_10"
 
 module.exports = {
-    entry: path.resolve(__dirname, '../src/script.js'),
+    entry: path.resolve(__dirname, `../${TODAYS_SOURCE}/script.js`),
     output:
     {
         hashFunction: 'xxhash64',
@@ -20,7 +21,7 @@ module.exports = {
             ]
         }),
         new HtmlWebpackPlugin({
-            template: path.resolve(__dirname, '../src/index.html'),
+            template: path.resolve(__dirname, `../${TODAYS_SOURCE}/index.html`),
             minify: true
         }),
         new MiniCSSExtractPlugin()

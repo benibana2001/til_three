@@ -9,6 +9,8 @@ const infoColor = (_message) =>
     return `\u001b[1m\u001b[34m${_message}\u001b[39m\u001b[22m`
 }
 
+const TODAYS_SOURCE = "src_2022_04_10"
+
 module.exports = merge(
     commonConfiguration,
     {
@@ -22,7 +24,7 @@ module.exports = merge(
             https: false,
             allowedHosts: 'all',
             hot: false,
-            watchFiles: ['src/**', 'static/**'],
+            watchFiles: [`${TODAYS_SOURCE}/**`, 'static/**'],
             static:
             {
                 watch: true,
