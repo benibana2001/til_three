@@ -30,34 +30,81 @@ const flagTeture = textureLoader.load('/textures/xxx.jpg');
 const geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
 // const geometry = new THREE.BoxGeometry(1, 1, 1, 1);
 
-const count = geometry.attributes.position.count;
-const randoms = new Float32Array(count);
-for (let i = 0; i < count; i++) {
-    randoms[i] = Math.random();
+// const count = geometry.attributes.position.count;
+// const randoms = new Float32Array(count);
+// for (let i = 0; i < count; i++) {
+//     randoms[i] = Math.random();
+// }
+// geometry.setAttribute('aRandom', new THREE.BufferAttribute(randoms, 1));
+
+/**
+ * Particles
+ */
+//Texture
+const particleTexture = textureLoader.load('/textures/particles/chara.png');
+// const particleTexture = textureLoader.load('/textures/particles/2.png');
+
+// Geometry
+const particlesGeometry = new THREE.BufferGeometry();
+const count = 5000;
+const positions = new Float32Array(count * 3);
+const colors = new Float32Array(count * 3);
+for(let i = 0; i < count * 3; i++) {
+    positions[i] = (Math.random() - 0.5) * 10;
 }
-geometry.setAttribute('aRandom', new THREE.BufferAttribute(randoms, 1));
+for(let i = 0; i < count * 3; i++) {
+    colors[i] = (Math.random() - 0.5) * 10;
+}
+particlesGeometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(positions, 3)
+)
+particlesGeometry.setAttribute(
+    'color',
+    new THREE.BufferAttribute(colors, 3)
+)
+
 
 // Material
-// const material = new THREE.MeshBasicMaterial();
+const particleMaterial = new THREE.PointsMaterial();
+particleMaterial.size = 0.4;
+// particleMaterial.color = new THREE.Color("blue");
+particleMaterial.sizeAttenuation = true;
+// particleMaterial.transparent = true;
+particleMaterial.alphaMap = particleTexture;
+// particleMaterial.alphaTest = 0.001;
+// particleMaterial.depthTest = false;
+particleMaterial.depthWrite = false;
+particleMaterial.blending = THREE.AdditiveBlending; // impact the performances
+particleMaterial.vertexColors = true;
+const particles = new THREE.Points(particlesGeometry, particleMaterial);
+scene.add(particles);
+// scene.add(new THREE.Mesh(
+//     new THREE.BoxBufferGeometry(),
+//     new THREE.MeshBasicMaterial()
+// ))
 
-const material = new THREE.RawShaderMaterial({
-  vertexShader: testVertexShader,
-  fragmentShader: testFragmentShader,
-  uniforms: {
-    uFrequency: { value: new THREE.Vector2(10, 5) },
-    uTime: { value: 0 },
-    uColor: { value: new THREE.Color('orange') },
-    uTexture: { value: flagTeture },
-  },
-});
+// Material
+const material = new THREE.MeshBasicMaterial();
 
-gui.add(material.uniforms.uFrequency.value, 'x').min(0).max(20).step(0.01).name('frequencyX');
-gui.add(material.uniforms.uFrequency.value, 'y').min(0).max(20).step(0.01).name('frequencyY');
+// const material = new THREE.RawShaderMaterial({
+//   vertexShader: testVertexShader,
+//   fragmentShader: testFragmentShader,
+//   uniforms: {
+//     uFrequency: { value: new THREE.Vector2(10, 5) },
+//     uTime: { value: 0 },
+//     uColor: { value: new THREE.Color('orange') },
+//     uTexture: { value: flagTeture },
+//   },
+// });
+
+// gui.add(material.uniforms.uFrequency.value, 'x').min(0).max(20).step(0.01).name('frequencyX');
+// gui.add(material.uniforms.uFrequency.value, 'y').min(0).max(20).step(0.01).name('frequencyY');
 
 // Mesh
-const mesh = new THREE.Mesh(geometry, material);
+// const mesh = new THREE.Mesh(geometry, material);
 // mesh.scale.y = 2/3
-scene.add(mesh);
+// scene.add(mesh);
 
 /**
  * Sizes
@@ -88,9 +135,12 @@ window.addEventListener("resize", () => {
 const camera = new THREE.PerspectiveCamera(
   75,
   sizes.width / sizes.height,
-  0.1,
-  100
+  0.1, //near
+  100 //far
 );
+gui.add(camera.position, "x").min(0).max(20).step(0.01).name('かめらx');
+gui.add(camera.position, "y").min(0).max(20).step(0.01).name('かめら.y');
+gui.add(camera.position, "z").min(0).max(20).step(0.01).name('かめら.z');
 camera.position.set(0.25, -0.25, 1);
 scene.add(camera);
 
@@ -115,8 +165,26 @@ const clock = new THREE.Clock();
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
 
+  // update particles
+//   particles.rotation.y = elapsedTime * 0.1
+  for(var i = 0; i < count; i++) {
+      const i3 = i * 3
+      if(i % 2 === 0) {
+        particlesGeometry.attributes.position.array[i3] += Math.random(elapsedTime) * 0.002;
+        particlesGeometry.attributes.position.array[i3 + 1] += Math.random(elapsedTime) * 0.002;
+        particlesGeometry.attributes.position.array[i3 + 2] += Math.random(elapsedTime) * 0.002;
+      } else {
+        particlesGeometry.attributes.position.array[i3] -= Math.random(elapsedTime) * 0.002;
+        particlesGeometry.attributes.position.array[i3 + 1] -= Math.random(elapsedTime) * 0.002;
+        particlesGeometry.attributes.position.array[i3 + 2] -= Math.random(elapsedTime) * 0.002;
+
+      }
+  }
+
+  particlesGeometry.attributes.position.needsUpdate = true;
+
   // Update material
-  material.uniforms.uTime.value = elapsedTime;
+//   material.uniforms.uTime.value = elapsedTime;
 
   // Update controls
   controls.update();
