@@ -48,7 +48,6 @@ window.addEventListener('resize', () => {
     renderer.setPixelRatio(2);
 })
 window.addEventListener('dblclick', () => {
-    console.log('double click');
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement
     if(!fullscreenElement) {
         if(canvas.requestFullscreen) {

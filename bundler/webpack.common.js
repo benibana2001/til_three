@@ -2,7 +2,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const MiniCSSExtractPlugin = require('mini-css-extract-plugin')
 const path = require('path')
-const TODAYS_SOURCE = "src_2022_04_10"
+const TODAYS_SOURCE = "src_2022_04_14"
 
 module.exports = {
     entry: path.resolve(__dirname, `../${TODAYS_SOURCE}/script.js`),
