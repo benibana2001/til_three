@@ -1,6 +1,7 @@
 import "./style.css";
 import * as THREE from "three";
 import * as dat from "lil-gui";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 /**
  * Base
@@ -32,9 +33,39 @@ scene.add(mesh);
 
 // Sizes
 const sizes = {
-    width: 400,
-    height: 300
+    width: window.innerWidth,
+    height: window.innerHeight
 }
+// canvas.style.width = `${sizes.width}px`;
+// canvas.style.height = `${sizes.height}px`;
+
+window.addEventListener('resize', () => {
+    sizes.width = window.innerWidth;
+    sizes.height = window.innerHeight;
+    camera.aspect = sizes.width / sizes.height
+    camera.updateProjectionMatrix()
+    renderer.setSize(sizes.width, sizes.height)
+    renderer.setPixelRatio(2);
+})
+window.addEventListener('dblclick', () => {
+    console.log('double click');
+    if(!fullscreenElement) {
+        if(canvas.requestFullscreen) {
+            canvas.requestFullscreen();
+        } else if(canvas.webkitFullscreen){
+            canvas.webkitRequestFullscreen()
+        }
+    }else {
+        if(document.exitFullscreen)
+        {
+            document.exitFullscreen()
+        }
+        else if(document.webkitExitFullscreen)
+        {
+            document.webkitExitFullscreen()
+        } 
+    }
+})
 
 // Camera
 const fov = 75;
@@ -50,31 +81,21 @@ const renderer = new THREE.WebGLRenderer({
     canvas ,
     antialias: true
 })
+renderer.setSize(sizes.width, sizes.height)
 // renderer.render(scene, camera);
 
 /**
- * Animate
-//  */
-const cursor = {
-    x: 0,
-    y: 0
-}
-window.addEventListener('mousemove', (event) => {
-    cursor.x = event.clientX / sizes.width - 0.5
-    cursor.y = - (event.clientY / sizes.height - 0.5)
-    
-    console.log(cursor.x, cursor.y)
-} )
+ * Controls
+ */
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
 
 // const clock = new THREE.Clock()
 const tick = () => {
     // const elapsedTime = clock.getElapsedTime()
 
-    // Update objects
-    camera.position.x = Math.sin(cursor.x * Math.PI * 2) * 2
-    camera.position.z = Math.cos(cursor.x * Math.PI * 2) * 2
-    camera.position.y = cursor.y * 3
-    camera.lookAt(mesh.position)
+    // Update controls
+    controls.update();
 
     renderer.render(scene, camera);
     window.requestAnimationFrame(tick);
