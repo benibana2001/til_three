@@ -8,18 +8,26 @@
   <body>
     <canvas id="canvas"></canvas>
     <script src="./minMatrix.js"></script>
+    <!-- Vertex Shader -->
     <script id="vs" type="x-shader/x-vertex">
       attribute vec3 position;
+      attribute vec4 color;
       uniform mat4 mvpMatrix;
 
+      varying vec4 vColor;
+
       void main(void) {
-          gl_Position = mvpMatrix * vec4(position, 1.0);
+        vColor = color;
+        gl_Position = mvpMatrix * vec4(position, 1.0);
       }
     </script>
+    <!-- Fragment Shader -->
     <script id="fs" type="x-shader/x-fragment">
-        void main(void) {
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-        }
+      precision mediump float;
+      varying vec4 vColor;
+      void main(void) {
+        gl_FragColor = vColor;
+      }
     </script>
 
     <script>
@@ -44,8 +52,14 @@
 
         const program = create_program(v_shader, f_shader);
 
-        const attLocation = gl.getAttribLocation(program, "position");
-        const attStride = 3;
+        const attLocation = [];
+        attLocation[0] = gl.getAttribLocation(program, "position");
+        attLocation[1] = gl.getAttribLocation(program, "color");
+
+        const attStride = [];
+        attStride[0] = 3;
+        attStride[1] = 4;
+
         // prettier-ignore
         const vertex_position = [
             0.0, 1.0, 0.0,
@@ -53,10 +67,23 @@
             -1.0, 0.0, 0.0
         ];
 
-        const vbo = create_vbo(vertex_position);
-        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-        gl.enableVertexAttribArray(attLocation);
-        gl.vertexAttribPointer(attLocation, attStride, gl.FLOAT, false, 0, 0);
+        // prettier-ignore
+        const vertex_color = [
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 1.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 1.0
+        ];
+
+        const position_vbo = create_vbo(vertex_position);
+        const color_vbo = create_vbo(vertex_color);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, position_vbo);
+        gl.enableVertexAttribArray(attLocation[0]);
+        gl.vertexAttribPointer(attLocation[0], attStride[0], gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, color_vbo);
+        gl.enableVertexAttribArray(attLocation[1]);
+        gl.vertexAttribPointer(attLocation[1], attStride[1], gl.FLOAT, false, 0, 0);
 
         const m = new matIV();
 
