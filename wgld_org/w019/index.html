@@ -1,0 +1,239 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script src="../minMatrix.js"></script>
+    <!-- Vertex Shader -->
+    <script id="vs" type="x-shader/x-vertex">
+      attribute vec3 position;
+      attribute vec4 color;
+      uniform mat4 mvpMatrix;
+
+      varying vec4 vColor;
+
+      void main(void) {
+        vColor = color;
+        gl_Position = mvpMatrix * vec4(position, 1.0);
+      }
+    </script>
+    <!-- Fragment Shader -->
+    <script id="fs" type="x-shader/x-fragment">
+      precision mediump float;
+      varying vec4 vColor;
+      void main(void) {
+        gl_FragColor = vColor;
+      }
+    </script>
+
+    <script>
+      window.onload = main;
+
+      function main() {
+        const c = document.getElementById("canvas");
+        c.width = 500;
+        c.height = 300;
+
+        /** @type {WebGLRenderingContext} */
+        const gl = c.getContext("webgl");
+
+        gl.enable(gl.DEPTH_TEST)
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+        gl.clearDepth(1.0);
+
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const v_shader = create_shader(gl, "vs");
+        const f_shader = create_shader(gl, "fs");
+
+        const program = create_program(v_shader, f_shader);
+
+        const attLocation = [];
+        attLocation[0] = gl.getAttribLocation(program, "position");
+        attLocation[1] = gl.getAttribLocation(program, "color");
+
+        const attStride = [];
+        attStride[0] = 3;
+        attStride[1] = 4;
+
+        // prettier-ignore
+        const vertex_position = [
+             0.0,  1.0,  0.0,
+             1.0,  0.0,  0.0,
+            -1.0,  0.0,  0.0,
+             0.0, -1.0,  0.0
+        ];
+
+        // prettier-ignore
+        const vertex_color = [
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 1.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 1.0,
+            1.0, 1.0, 1.0, 1.0
+        ];
+
+        // prettier-ignore
+        const index = [
+            0, 1, 2,
+            1, 2, 3
+        ]
+
+        const position_vbo = create_vbo(vertex_position);
+        const color_vbo = create_vbo(vertex_color);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, position_vbo);
+        gl.enableVertexAttribArray(attLocation[0]);
+        gl.vertexAttribPointer(
+          attLocation[0],
+          attStride[0],
+          gl.FLOAT,
+          false,
+          0,
+          0
+        );
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, color_vbo);
+        gl.enableVertexAttribArray(attLocation[1]);
+        gl.vertexAttribPointer(
+          attLocation[1],
+          attStride[1],
+          gl.FLOAT,
+          false,
+          0,
+          0
+        );
+
+        const ibo = create_ibo(index);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+
+        const uniLocation = gl.getUniformLocation(program, "mvpMatrix");
+        const m = new matIV();
+        const mMatrix = m.identity(m.create());
+        const vMatrix = m.identity(m.create());
+        const pMatrix = m.identity(m.create());
+        const tmpMatrix = m.identity(m.create());
+        const mvpMatrix = m.identity(m.create());
+
+        m.lookAt([0.0, 0.0, 5.0], [0, 0, 0], [0, 1, 0], vMatrix);
+        m.perspective(45, c.width / c.height, 0.1, 100, pMatrix);
+        m.multiply(pMatrix, vMatrix, tmpMatrix);
+
+        let count = 0;
+        const loop = () => {
+          gl.clearColor(0.0, 0.0, 0.0, 1.0);
+          gl.clearDepth(1.0);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+          count++;
+
+          const rad = ((count % 360) * Math.PI) / 180;
+
+          // model 1
+          m.identity(mMatrix);
+          m.translate(mMatrix, [Math.cos(rad) * 2 , 0.0, Math.sin(rad)], mMatrix)
+          m.rotate(mMatrix, rad, [0, 1, 0], mMatrix);
+          m.multiply(tmpMatrix, mMatrix, mvpMatrix);
+          gl.uniformMatrix4fv(uniLocation, false, mvpMatrix);
+          gl.drawElements(gl.TRIANGLES, index.length, gl.UNSIGNED_SHORT, 0);
+          //model2
+          m.identity(mMatrix)
+          m.translate(mMatrix, [-Math.cos(rad) * 2, 0.0, -Math.sin(rad)], mMatrix)
+          m.rotate(mMatrix, rad, [1, 0, 0], mMatrix)
+          m.multiply(tmpMatrix, mMatrix, mvpMatrix)
+          gl.uniformMatrix4fv(uniLocation, false, mvpMatrix)
+          gl.drawElements(gl.TRIANGLES, index.length, gl.UNSIGNED_SHORT, 0)
+
+          gl.flush();
+          setTimeout(loop, 1000 / 30);
+        };
+        loop();
+
+        function create_program(vs, fs) {
+          const program = gl.createProgram();
+          gl.attachShader(program, vs);
+          gl.attachShader(program, fs);
+
+          gl.linkProgram(program);
+
+          if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(gl.getProgramInfoLog(param));
+            console.error("Could not initialize shaders");
+          }
+          gl.useProgram(program);
+          return program;
+        }
+
+        /**
+         * @param {number[]} data
+         */
+        function create_vbo(data) {
+          const vbo = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+          gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array(data),
+            gl.STATIC_DRAW
+          );
+          gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          return vbo;
+        }
+
+        /**
+         * @type {number[]}
+         */
+        function create_ibo(data) {
+          const ibo = gl.createBuffer();
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+          gl.bufferData(
+            gl.ELEMENT_ARRAY_BUFFER,
+            new Int16Array(data),
+            gl.STATIC_DRAW
+          );
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+          return ibo;
+        }
+      }
+
+      /**
+       *
+       * @param {WebGLRenderingContext} gl
+       * @param {string} id
+       */
+      function create_shader(gl, id) {
+        const scriptElement = document.getElementById(id);
+
+        if (!scriptElement) {
+          console.error("Shader script is none");
+          return;
+        }
+
+        let shader;
+        switch (scriptElement.type) {
+          case "x-shader/x-vertex":
+            shader = gl.createShader(gl.VERTEX_SHADER);
+            break;
+          case "x-shader/x-fragment":
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+            break;
+          default:
+            return;
+        }
+
+        gl.shaderSource(shader, scriptElement.text);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error(gl.getShaderInfoLog(shader));
+          return null;
+        }
+
+        return shader;
+      }
+    </script>
+  </body>
+</html>
