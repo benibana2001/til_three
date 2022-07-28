@@ -38,10 +38,13 @@
     </script>
 
     <script>
-      let texture;
+      const imgAry = [];
+      const image01 = createImgPromise("./test.png", imgAry);
+
       window.onload = main;
 
-      function main() {
+      async function main() {
+        await Promise.all(imgAry);
         const c = document.getElementById("canvas");
         c.width = 500;
         c.height = 300;
@@ -125,7 +128,7 @@
         gl.depthFunc(gl.LEQUAL);
 
         gl.activeTexture(gl.TEXTURE0);
-        create_texture("./test.png");
+        const glTexture = create_texture(image01);
 
         let count = 0;
         const loop = () => {
@@ -137,7 +140,7 @@
 
           const rad = ((count % 360) * Math.PI) / 180;
 
-          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.bindTexture(gl.TEXTURE_2D, glTexture);
           gl.uniform1i(uniLocation[1], 0);
 
           m.identity(mMatrix);
@@ -196,30 +199,28 @@
           return ibo;
         }
 
-        function create_texture(source) {
-          const img = new Image();
-          const bindTexture = () => {
-            const tex = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, tex);
-            gl.texImage2D(
-              gl.TEXTURE_2D,
-              0,
-              gl.RGBA,
-              gl.RGBA,
-              gl.UNSIGNED_BYTE,
-              img
-            );
+        function create_texture(img) {
+          const tex = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            img
+          );
 
-            gl.generateMipmap(gl.TEXTURE_2D);
-            gl.bindTexture(gl.TEXTURE_2D, null);
-            texture = tex;
-          };
-
-          img.src = source;
-          img.onload = bindTexture;
+          gl.generateMipmap(gl.TEXTURE_2D);
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          return tex;
         }
         // VBOをバインドし登録する関数
         function set_attribute(vbo, attL, attS) {
+          if (vbo.length !== attL.length || vbo.length !== attS.length) {
+            console.error("attributes length is not equal");
+            return;
+          }
           for (let i in vbo) {
             gl.bindBuffer(gl.ARRAY_BUFFER, vbo[i]);
             gl.enableVertexAttribArray(attL[i]);
@@ -261,6 +262,19 @@
         }
 
         return shader;
+      }
+
+      function createImgPromise(path, imgAry) {
+        const img = new Image();
+        const promise = new Promise((resolve) => {
+          img.src = path;
+          img.onload = () => {
+            console.log(`Image load done: ${path}`);
+            resolve(true);
+          };
+        });
+        imgAry.push(promise);
+        return img;
       }
     </script>
   </body>
