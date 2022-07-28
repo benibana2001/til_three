@@ -14,12 +14,15 @@
       attribute vec3 normal;
       attribute vec4 color;
 
+      uniform mat4 mMatrix;
       uniform mat4 mvpMatrix;
 
+      varying vec3 vPosition;
       varying vec3 vNormal;
       varying vec4 vColor;
 
       void main(void) {
+        vPosition = (mMatrix * vec4(position, 1.0)).xyz;
         vNormal = normal;
         vColor = color;
         gl_Position = mvpMatrix * vec4(position, 1.0);
@@ -30,19 +33,21 @@
       precision mediump float;
 
       uniform mat4 invMatrix;
-      uniform vec3 lightDirection;
+      uniform vec3 lightPosition;
       uniform vec3 eyeDirection;
       uniform vec3 ambientColor;
 
+      varying vec3 vPosition;
       varying vec3 vNormal;
       varying vec4 vColor;
 
       void main(void) {
-        vec3 invLight = normalize(invMatrix * vec4(lightDirection, 0.0)).xyz;
+        vec3 lightVec = lightPosition - vPosition;
+        vec3 invLight = normalize(invMatrix * vec4(lightVec, 0.0)).xyz;
         vec3 invEye = normalize(invMatrix * vec4(eyeDirection, 0.0)).xyz;
         vec3 halfLE = normalize(invLight + invEye);
-        float diffuse = clamp(dot(vNormal, invLight), 0.0, 1.0);
-        float speclular = pow(clamp(dot(vNormal, invLight), 0.0, 1.0), 80.0);
+        float diffuse = clamp(dot(vNormal, invLight), 0.0, 1.0) + 0.2;
+        float speclular = pow(clamp(dot(vNormal, invLight), 0.0, 1.0), 50.0);
         vec4 destColor = vColor * vec4(vec3(diffuse), 1.0) + vec4(vec3(speclular), 1.0);
         gl_FragColor = destColor;
       }
@@ -83,57 +88,36 @@
         attStride[1] = 3;
         attStride[2] = 4;
 
-        // Create thorus
-        const [vertex_position, normal, vertex_color, index] = torus(
-          32,
-          32,
-          1.0,
-          2.0
-        );
-        const position_vbo = create_vbo(vertex_position);
-        const normal_vbo = create_vbo(normal);
-        const color_vbo = create_vbo(vertex_color);
+        // Create torus
+        const thorusData = torus(64, 64, 0.5, 1.5, [0.75, 0.25, 0.25, 1.0]);
+        const tPosition = create_vbo(thorusData[0]);
+        const tNormal = create_vbo(thorusData[1]);
+        const tColor = create_vbo(thorusData[2]);
+        const tIndex = create_ibo(thorusData[3]);
+        const tVBOList = [tPosition, tNormal, tColor];
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, position_vbo);
-        gl.enableVertexAttribArray(attLocation[0]);
-        gl.vertexAttribPointer(
-          attLocation[0],
-          attStride[0],
-          gl.FLOAT,
-          false,
-          0,
-          0
-        );
+        // Create sphere
+        const sphereDate = sphere(64, 64, 2.0, [0.25, 0.25, 0.75, 1.0]);
+        const sPosition = create_vbo(sphereDate.p);
+        const sNormal = create_vbo(sphereDate.n);
+        const sColor = create_vbo(sphereDate.c);
+        const sIndex = create_ibo(sphereDate.i);
+        const sVBOList = [sPosition, sNormal, sColor];
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, normal_vbo);
-        gl.enableVertexAttribArray(attLocation[1]);
-        gl.vertexAttribPointer(
-          attLocation[1],
-          attStride[1],
-          gl.FLOAT,
-          false,
-          0,
-          0
-        );
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, color_vbo);
-        gl.enableVertexAttribArray(attLocation[2]);
-        gl.vertexAttribPointer(
-          attLocation[2],
-          attStride[2],
-          gl.FLOAT,
-          false,
-          0,
-          0
-        );
-
-        const ibo = create_ibo(index);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+        // VBOをバインドし登録する関数
+        const set_attribute = (vbo, attL, attS) => {
+          for (let i in vbo) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo[i]);
+            gl.enableVertexAttribArray(attL[i]);
+            gl.vertexAttribPointer(attL[i], attS[i], gl.FLOAT, false, 0, 0);
+          }
+        };
 
         const uniLocation = [
           gl.getUniformLocation(program, "mvpMatrix"),
+          gl.getUniformLocation(program, "mMatrix"),
           gl.getUniformLocation(program, "invMatrix"),
-          gl.getUniformLocation(program, "lightDirection"),
+          gl.getUniformLocation(program, "lightPosition"),
           gl.getUniformLocation(program, "eyeDirecton"),
           gl.getUniformLocation(program, "ambientColor"),
         ];
@@ -145,13 +129,13 @@
         const mvpMatrix = m.identity(m.create());
         const invMatrix = m.identity(m.create());
 
-        m.lookAt([0.0, 0.0, 20.0], [0, 0, 0], [0, 1, 0], vMatrix);
+        const lightPosition = [0.0, 0.0, 0.0];
+        const eyeDirection = [0.0, 0.0, 20.0];
+        const ambientColor = [0.1, 0.1, 0.1, 1.0];
+
+        m.lookAt(eyeDirection, [0, 0, 0], [0, 1, 0], vMatrix);
         m.perspective(45, c.width / c.height, 0.1, 100, pMatrix);
         m.multiply(pMatrix, vMatrix, tmpMatrix);
-
-        const lightDirection = [-0.5, 0.5, 0.5];
-        const eyeDirection = [0.0, 0.0, 20.0];
-        const ambientColor = [0.1, 0.1, 1.0, 1.0]
 
         let count = 0;
         const loop = () => {
@@ -162,19 +146,48 @@
           count++;
 
           const rad = ((count % 360) * Math.PI) / 180;
-          m.identity(mMatrix);
-          m.rotate(mMatrix, rad, [0, 1, 1], mMatrix);
-          m.multiply(tmpMatrix, mMatrix, mvpMatrix);
+          const tx = Math.cos(rad) * 3.5;
+          const ty = Math.sin(rad) * 3.5;
+          const tz = Math.sin(rad) * 3.5;
 
+          // torus
+          set_attribute(tVBOList, attLocation, attStride);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tIndex);
+
+          m.identity(mMatrix);
+          m.translate(mMatrix, [tx, -ty, -tz], mMatrix);
+          m.rotate(mMatrix, -rad, [0, 1, 1], mMatrix);
+          m.multiply(tmpMatrix, mMatrix, mvpMatrix);
           m.inverse(mMatrix, invMatrix);
 
           gl.uniformMatrix4fv(uniLocation[0], false, mvpMatrix);
-          gl.uniformMatrix4fv(uniLocation[1], false, invMatrix);
-          gl.uniform3fv(uniLocation[2], lightDirection);
-          gl.uniform3fv(uniLocation[3], eyeDirection);
-          gl.uniform4fv(uniLocation[4], ambientColor);
+          gl.uniformMatrix4fv(uniLocation[1], false, mMatrix);
+          gl.uniformMatrix4fv(uniLocation[2], false, invMatrix);
+          gl.uniform3fv(uniLocation[3], lightPosition);
+          gl.uniform3fv(uniLocation[4], eyeDirection);
+          gl.uniform4fv(uniLocation[5], ambientColor);
+          gl.drawElements(
+            gl.TRIANGLES,
+            thorusData[3].length,
+            gl.UNSIGNED_SHORT,
+            0
+          );
 
-          gl.drawElements(gl.TRIANGLES, index.length, gl.UNSIGNED_SHORT, 0);
+          // sphere
+          set_attribute(sVBOList, attLocation, attStride);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sIndex);
+
+          m.identity(mMatrix);
+          m.translate(mMatrix, [-tx, ty, tz], mMatrix);
+          m.rotate(mMatrix, rad, [0, 1, 1], mMatrix);
+          m.multiply(tmpMatrix, mMatrix, mvpMatrix);
+          m.inverse(mMatrix, invMatrix);
+
+          gl.uniformMatrix4fv(uniLocation[0], false, mvpMatrix);
+          gl.uniformMatrix4fv(uniLocation[1], false, mMatrix);
+          gl.uniformMatrix4fv(uniLocation[2], false, invMatrix);
+          gl.drawElements(gl.TRIANGLES, sphereDate.i.length, gl.UNSIGNED_SHORT, 0);
+
           gl.flush();
           setTimeout(loop, 1000 / 30);
         };
@@ -269,7 +282,7 @@
        * @param {number} orad 原点からパイプの中心までの距離
        * @returns {Array}
        */
-      function torus(row, column, irad, orad) {
+      function torus(row, column, irad, orad, col) {
         const pos = [],
           nor = [],
           color = [],
@@ -290,10 +303,14 @@
             const tz = (rr * irad + orad) * Math.sin(tr); // 原点からのz
             const rx = rr * Math.cos(tr); // 頂点における法線のx方向
             const rz = rr * Math.sin(tr); // 頂点における法線のz方向
+            let tc;
+            if (col) {
+              tc = col;
+            } else {
+              tc = hsva((360 / column) * ii, 1, 1, 1);
+            }
             pos.push(tx, ty, tz);
             nor.push(rx, ry, rz);
-
-            const tc = hsva((360 / column) * ii, 1, 1, 1);
             color.push(tc[0], tc[1], tc[2], tc[3]);
           }
         }
@@ -307,6 +324,48 @@
 
         return [pos, nor, color, idx];
       }
+
+      function sphere(row, column, rad, color) {
+        const [pos, nor, col, idx] = [[], [], [], []];
+        for (let i = 0; i <= row; i++) {
+          const r = (Math.PI / row) * i;
+          const ry = Math.cos(r);
+          const rr = Math.sin(r);
+
+          for (let ii = 0; ii <= column; ii++) {
+            const tr = ((Math.PI * 2) / column) * ii;
+            const tx = rr * rad * Math.cos(tr);
+            const ty = ry * rad;
+            const tz = rr * rad * Math.sin(tr);
+            const rx = rr * Math.cos(tr);
+            const rz = rr * Math.sin(tr);
+            let tc = "";
+            if (color) {
+              tc = color;
+            } else {
+              tc = hsva((360 / row) * i, 1, 1, 1);
+            }
+            pos.push(tx, ty, tz);
+            nor.push(rx, ry, rz);
+            col.push(...tc);
+          }
+        }
+        let r = 0;
+        for (let i = 0; i < row; i++) {
+          for (let ii = 0; ii < column; ii++) {
+            r = (column + 1) * i + ii;
+            idx.push(r, r + 1, r + column + 2);
+            idx.push(r, r + column + 2, r + column + 1);
+          }
+        }
+        return {
+          p: pos,
+          n: nor,
+          c: col,
+          i: idx,
+        };
+      }
+
       /**
        * HSVカラーからRGBカラーを返す
        * @param {number} h
