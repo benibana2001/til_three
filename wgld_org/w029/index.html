@@ -1,0 +1,329 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <p>
+      <input id="transparency" name="blend" type="radio" checked="" />
+      透明
+      <input id="add" name="blend" type="radio" />加算
+    </p>
+    <p><input id="range" type="range" min="0" max="100" value="70" /></p>
+    <script src="../minMatrix.js"></script>
+    <!-- Vertex Shader -->
+    <script id="vs" type="x-shader/x-vertex">
+      attribute vec3 position;
+      attribute vec4 color;
+      attribute vec2 textureCoord;
+      uniform mat4 mvpMatrix;
+      uniform float vertexAlpha;
+      varying vec4 vColor;
+      varying vec2 vTextureCoord;
+
+      void main(void) {
+        vColor = vec4(color.rgb, color.a * vertexAlpha);
+        vTextureCoord = textureCoord;
+        gl_Position = mvpMatrix * vec4(position, 1.0);
+      }
+    </script>
+    <!-- Fragment Shader -->
+    <script id="fs" type="x-shader/x-fragment">
+      precision mediump float;
+
+      uniform sampler2D texture;
+      uniform int useTexture;
+      varying vec4 vColor;
+      varying vec2 vTextureCoord;
+
+      void main(void) {
+        vec4 destColor = vec4(0.0);
+        if(bool(useTexture)) {
+            vec4 smpColor = texture2D(texture, vTextureCoord);
+            destColor = vColor * smpColor;
+        }else{
+            destColor = vColor;
+        }
+        gl_FragColor = destColor;
+      }
+    </script>
+
+    <script>
+      const imgAry = [];
+      const image = createImgPromise("./test.png", imgAry);
+
+      // dom
+      const elmTransparency = document.getElementById("transparency");
+      const elmAdd = document.getElementById("add");
+      const elmRange = document.getElementById("range");
+
+      window.onload = main;
+
+      async function main() {
+        await Promise.all(imgAry);
+        const c = document.getElementById("canvas");
+        c.width = 500;
+        c.height = 300;
+
+        /** @type {WebGLRenderingContext} */
+        const gl = c.getContext("webgl");
+
+        gl.clearColor(0.0, 0.75, 0.75, 1.0);
+        gl.clearDepth(1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const v_shader = create_shader(gl, "vs");
+        const f_shader = create_shader(gl, "fs");
+        const program = create_program(v_shader, f_shader);
+
+        const attLocation = [];
+        attLocation[0] = gl.getAttribLocation(program, "position");
+        attLocation[1] = gl.getAttribLocation(program, "color");
+        attLocation[2] = gl.getAttribLocation(program, "textureCoord");
+
+        const attStride = [];
+        attStride[0] = 3;
+        attStride[1] = 4;
+        attStride[2] = 2;
+
+        // prettier-ignore
+        const position = [
+            -1.0,  1.0,  0.0,
+             1.0,  1.0,  0.0,
+            -1.0, -1.0,  0.0,
+             1.0, -1.0,  0.0
+        ];
+
+        // prettier-ignore
+        const color = [
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 1.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 1.0,
+            1.0, 1.0, 1.0, 1.0,
+        ];
+
+        // prettier-ignore
+        const textureCoord = [
+            0.0, 0.0,
+            1.0, 0.0,
+            0.0, 1.0,
+            1.0, 1.0,
+        ]
+
+        // prettier-ignore
+        const index = [
+            0, 1, 2,
+            3, 2, 1
+        ]
+
+        const vPosition = create_vbo(position);
+        const vColor = create_vbo(color);
+        const vTextureCoord = create_vbo(textureCoord);
+        const VBOList = [vPosition, vColor, vTextureCoord];
+        const iIndex = create_ibo(index);
+
+        set_attribute(VBOList, attLocation, attStride);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, iIndex);
+
+        const uniLocation = [];
+        uniLocation[0] = gl.getUniformLocation(program, "mvpMatrix");
+        uniLocation[1] = gl.getUniformLocation(program, "vertexAlpha");
+        uniLocation[2] = gl.getUniformLocation(program, "texture");
+        uniLocation[3] = gl.getUniformLocation(program, "useTexture");
+
+        const m = new matIV();
+        const mMatrix = m.identity(m.create());
+        const vMatrix = m.identity(m.create());
+        const pMatrix = m.identity(m.create());
+        const tmpMatrix = m.identity(m.create());
+        const mvpMatrix = m.identity(m.create());
+
+        m.lookAt([0.0, 2.0, 5.0], [0, 0, 0], [0, 1, 0], vMatrix);
+        m.perspective(45, c.width / c.height, 0.1, 100, pMatrix);
+        m.multiply(pMatrix, vMatrix, tmpMatrix);
+
+        gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.depthFunc(gl.LEQUAL);
+
+        const glTexture = create_texture(image);
+
+        let count = 0;
+        const loop = () => {
+          if (elmTransparency.checked)
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+          if (elmAdd.checked) gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+          gl.clearColor(0.0, 0.0, 0.0, 1.0);
+          gl.clearDepth(1.0);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+          count++;
+
+          const rad = ((count % 360) * Math.PI) / 180;
+
+          m.identity(mMatrix);
+          m.translate(mMatrix, [0.25, 0.25, -0.25], mMatrix);
+          m.rotate(mMatrix, rad, [0, 1, 0], mMatrix);
+          m.multiply(tmpMatrix, mMatrix, mvpMatrix);
+
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, glTexture);
+
+          gl.disable(gl.BLEND);
+
+          gl.uniformMatrix4fv(uniLocation[0], false, mvpMatrix);
+          gl.uniform1f(uniLocation[1], 1.0);
+          gl.uniform1i(uniLocation[2], 0);
+          gl.uniform1i(uniLocation[3], true);
+          gl.drawElements(gl.TRIANGLES, index.length, gl.UNSIGNED_SHORT, 0);
+
+          m.identity(mMatrix);
+          m.translate(mMatrix, [-0.25, -0.25, 0.25], mMatrix);
+          m.rotate(mMatrix, rad, [0, 0, 1], mMatrix);
+          m.multiply(tmpMatrix, mMatrix, mvpMatrix);
+
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          gl.enable(gl.BLEND);
+
+          const vertexAlpha = parseFloat(elmRange.value / 100);
+          gl.uniformMatrix4fv(uniLocation[0], false, mvpMatrix);
+          gl.uniform1f(uniLocation[1], vertexAlpha);
+          gl.uniform1i(uniLocation[2], 0);
+          gl.uniform1i(uniLocation[3], false);
+          gl.drawElements(gl.TRIANGLES, index.length, gl.UNSIGNED_SHORT, 0);
+
+          gl.flush();
+          setTimeout(loop, 1000 / 30);
+        };
+        loop();
+
+        function create_program(vs, fs) {
+          const program = gl.createProgram();
+          gl.attachShader(program, vs);
+          gl.attachShader(program, fs);
+
+          gl.linkProgram(program);
+
+          if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(gl.getProgramInfoLog(param));
+            console.error("Could not initialize shaders");
+          }
+          gl.useProgram(program);
+          return program;
+        }
+
+        /**
+         * @param {number[]} data
+         */
+        function create_vbo(data) {
+          const vbo = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+          gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array(data),
+            gl.STATIC_DRAW
+          );
+          gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          return vbo;
+        }
+
+        /**
+         * @type {number[]}
+         */
+        function create_ibo(data) {
+          const ibo = gl.createBuffer();
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+          gl.bufferData(
+            gl.ELEMENT_ARRAY_BUFFER,
+            new Int16Array(data),
+            gl.STATIC_DRAW
+          );
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+          return ibo;
+        }
+
+        function create_texture(img) {
+          const tex = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            img
+          );
+
+          gl.generateMipmap(gl.TEXTURE_2D);
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          return tex;
+        }
+        // VBOをバインドし登録する関数
+        function set_attribute(vbo, attL, attS) {
+          if (vbo.length !== attL.length || vbo.length !== attS.length) {
+            console.error("attributes length is not equal");
+            return;
+          }
+          for (let i in vbo) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo[i]);
+            gl.enableVertexAttribArray(attL[i]);
+            gl.vertexAttribPointer(attL[i], attS[i], gl.FLOAT, false, 0, 0);
+          }
+        }
+      }
+
+      /**
+       *
+       * @param {WebGLRenderingContext} gl
+       * @param {string} id
+       */
+      function create_shader(gl, id) {
+        const scriptElement = document.getElementById(id);
+
+        if (!scriptElement) {
+          console.error("Shader script is none");
+          return;
+        }
+
+        let shader;
+        switch (scriptElement.type) {
+          case "x-shader/x-vertex":
+            shader = gl.createShader(gl.VERTEX_SHADER);
+            break;
+          case "x-shader/x-fragment":
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+            break;
+          default:
+            return;
+        }
+
+        gl.shaderSource(shader, scriptElement.text);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error(gl.getShaderInfoLog(shader));
+          return null;
+        }
+
+        return shader;
+      }
+
+      function createImgPromise(path, imgAry) {
+        const img = new Image();
+        const promise = new Promise((resolve) => {
+          img.src = path;
+          img.onload = () => {
+            console.log(`Image load done: ${path}`);
+            resolve(true);
+          };
+        });
+        imgAry.push(promise);
+        return img;
+      }
+    </script>
+  </body>
+</html>
