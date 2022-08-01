@@ -263,7 +263,8 @@
           gl.bindTexture(gl.TEXTURE_2D, null);
           return tex;
         }
-        // VBOをバインドし登録する関数
+        
+        // VBOにattributeを登録する関数
         function set_attribute(vbo, attL, attS) {
           if (vbo.length !== attL.length || vbo.length !== attS.length) {
             console.error("attributes length is not equal");
