@@ -1,0 +1,36 @@
+<html lang="jp"><head><script id="fs" type="x-shader/x-fragment">precision mediump float;
+uniform float time;
+uniform vec2 mouse;
+uniform vec2 resolution;
+
+void main(void){
+  vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+  vec2 color = (vec2(1.0) + p.xy) * 0.5;
+  gl_FragColor = vec4(color, 0.0, 1.0);
+}
+</script>
+
+<script id="vs" type="x-shader/x-vertex">
+  attribute vec3 position;
+  void main(void) {
+    gl_Position = vec4(position, 1.0);
+  }
+</script>
+<style type="text/css">
+  * {
+    margin: 0 auto;
+    padding: 0;
+    text-align: center;
+  }
+  canvas {
+    margin-top: 20px;
+    box-shadow: 0 0 0 1px gray;
+  }
+</style>
+
+<script src="./script.js"></script>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+</body>
+</html>
